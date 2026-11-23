@@ -18,6 +18,9 @@ import { useRequestTabs } from './hooks/useRequestTabs';
 import { useCollections } from './hooks/useCollections';
 import { runAutoExtraction } from './utils/variableExtractor';
 import { api } from './services/api';
+import { findRequestAndSubCollection } from './utils/collectionUtils';
+
+const SESSION_KEY = 'corgi.session';
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
@@ -31,7 +34,7 @@ export default function App() {
   const [storageInfo, setStorageInfo] = useState(null);
 
   // Request Tabs
-  const { tabs, addOrUpdateTab, updateTab, removeTab } = useRequestTabs();
+  const { tabs, setTabs, addOrUpdateTab, updateTab, removeTab } = useRequestTabs();
 
   // Environments
   const {
@@ -69,8 +72,7 @@ export default function App() {
     activeRequestId, setActiveRequestId, activeCollectionId, setActiveCollectionId,
     activeSubCollectionId, setActiveSubCollectionId, response, setResponse,
     responseCache, setResponseCache, isLoading, stashCurrentRequestDraft,
-    handleUrlChange, handleParamsChange, handleSendRequest, clearRequestResponse,
-    handleSelectTab, handleSelectRequest, handleNewRequest, loadNewBlankRequest,
+    handleUrlChange, handleParamsChange, handleSendRequest, handleSelectTab, handleSelectRequest, handleNewRequest, loadNewBlankRequest,
     handleSelectHistoryItem, handleSendPreset
   } = useRequestEditor();
 
@@ -106,6 +108,7 @@ export default function App() {
     handleCreateRequestInCollection,
     handleCreateRequestInSubCollection,
     handleDuplicateRequest,
+    handlePatchSavedRequest,
     handleDeleteRequest
   } = useCollections({
     activeCollectionId,
@@ -128,13 +131,52 @@ export default function App() {
     setResponseCache
   });
 
-  // Load initial backend data
+  // Load initial backend data, then restore the tabs that were open before the refresh
+  const [sessionReady, setSessionReady] = useState(false);
   useEffect(() => {
-    refreshCollections();
+    refreshCollections().then((cols) => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+        const restored = [];
+        for (const t of saved?.tabs || []) {
+          for (const col of cols) {
+            const { request, subCollection } = findRequestAndSubCollection(col, t.id);
+            if (request) {
+              restored.push({
+                tab: {
+                  id: request.id,
+                  name: request.name || 'Untitled Request',
+                  method: request.method || 'GET',
+                  collectionId: col.id,
+                  subCollectionId: subCollection ? subCollection.id : null
+                },
+                request
+              });
+              break;
+            }
+          }
+        }
+        if (restored.length > 0) {
+          setTabs(restored.map((r) => r.tab));
+          const active = restored.find((r) => r.tab.id === saved.activeId) || restored[0];
+          handleSelectRequest(active.request, active.tab.collectionId, active.tab.subCollectionId);
+        }
+      } catch (err) {
+        console.error('Failed to restore session:', err);
+      }
+      setSessionReady(true);
+    });
     refreshEnvironments();
     refreshHistory();
     api.getStorageInfo().then(setStorageInfo).catch(() => {});
   }, [refreshCollections, refreshEnvironments, refreshHistory]);
+
+  // Remember open tabs (not responses or unsaved drafts) across page refreshes
+  useEffect(() => {
+    if (!sessionReady) return;
+    const saved = tabs.filter((t) => t.collectionId);
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ tabs: saved, activeId: activeRequestId }));
+  }, [sessionReady, tabs, activeRequestId]);
 
   // Method & Request Name live sync with active Tab
   const onChangeMethod = (m) => {
@@ -149,6 +191,18 @@ export default function App() {
     if (activeRequestId) {
       updateTab(activeRequestId, { name });
     }
+  };
+
+  // Auto-save on blur: only the edited field is persisted, and only for saved requests
+  const onBlurRequestName = () => {
+    const name = requestName.trim();
+    if (!name || !activeCollectionId) return;
+    handlePatchSavedRequest(activeCollectionId, activeRequestId, { name });
+  };
+
+  const onBlurUrl = () => {
+    if (!activeCollectionId) return;
+    handlePatchSavedRequest(activeCollectionId, activeRequestId, { url, params });
   };
 
   // Send Request: every sent request is guaranteed to be a tab
@@ -184,22 +238,8 @@ export default function App() {
     });
   };
 
-  // Closing a tab clears that request's saved response completely
+  // Closing a tab keeps its latest response for this session (cleared on page refresh)
   const onCloseTab = (tabId) => {
-    clearRequestResponse(tabId);
-
-    setCollections((prev) =>
-      prev.map((c) => ({
-        ...c,
-        subCollections: (c.subCollections || []).map((s) => ({
-          ...s,
-          requests: (s.requests || []).map((r) =>
-            r.id === tabId ? { ...r, lastResponse: undefined } : r
-          )
-        }))
-      }))
-    );
-
     const { nextTabs, nextActiveId, isCurrentClosed } = removeTab(tabId, activeRequestId);
 
     if (isCurrentClosed) {
@@ -212,6 +252,15 @@ export default function App() {
         setResponse(null);
       }
     }
+  };
+
+  const onCloseAllTabs = () => {
+    stashCurrentRequestDraft();
+    setTabs([]);
+    setActiveRequestId(null);
+    setActiveCollectionId(null);
+    setActiveSubCollectionId(null);
+    setResponse(null);
   };
 
   const onQuickSave = () => {
@@ -325,8 +374,10 @@ export default function App() {
                 onSelectTab={onSelectTab}
                 onCloseTab={onCloseTab}
                 onNewTab={onNewTab}
+                onCloseAllTabs={onCloseAllTabs}
                 requestName={requestName}
                 onChangeRequestName={onChangeRequestName}
+                onBlurRequestName={onBlurRequestName}
                 activeCollection={activeCollection}
                 activeSubCollection={activeSubCollection}
               />
@@ -338,6 +389,7 @@ export default function App() {
                     onChangeMethod={onChangeMethod}
                     url={url}
                     onChangeUrl={handleUrlChange}
+                    onBlurUrl={onBlurUrl}
                     onSend={onSend}
                     isLoading={isLoading}
                     activeEnvVariables={activeEnvVariables}

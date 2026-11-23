@@ -9,6 +9,7 @@ export function MethodUrlBar({
   onChangeMethod,
   url,
   onChangeUrl,
+  onBlurUrl,
   onSend,
   isLoading,
   activeEnvVariables = [],
@@ -49,6 +50,7 @@ export function MethodUrlBar({
               value={url}
               onChange={onChangeUrl}
               onKeyDown={handleKeyDown}
+              onBlur={onBlurUrl}
               activeEnvVariables={activeEnvVariables}
               activeEnvName={activeEnvName}
               onUpdateVariable={onUpdateVariable}

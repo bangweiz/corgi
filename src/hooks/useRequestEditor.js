@@ -24,8 +24,8 @@ export function useRequestEditor() {
   const [formData, setFormData] = useState([]);
   const [extractRules, setExtractRules] = useState([]);
   const [requestName, setRequestName] = useState('GET Request (with params)');
-  const [activeRequestId, setActiveRequestId] = useState('req_1');
-  const [activeCollectionId, setActiveCollectionId] = useState('sample');
+  const [activeRequestId, setActiveRequestId] = useState(null);
+  const [activeCollectionId, setActiveCollectionId] = useState(null);
   const [activeSubCollectionId, setActiveSubCollectionId] = useState(null);
 
   // Response & Loading States
@@ -182,28 +182,6 @@ export function useRequestEditor() {
   );
 
   /**
-   * Clear saved response for a given request ID (called when closing a tab)
-   */
-  const clearRequestResponse = useCallback(
-    (reqId) => {
-      setResponseCache((prev) => {
-        const next = { ...prev };
-        delete next[reqId];
-        return next;
-      });
-
-      if (requestDraftsRef.current[reqId]) {
-        requestDraftsRef.current[reqId].response = null;
-      }
-
-      if (activeRequestId === reqId) {
-        setResponse(null);
-      }
-    },
-    [activeRequestId]
-  );
-
-  /**
    * Select an open tab to load into the workspace editor
    */
   const handleSelectTab = useCallback(
@@ -243,7 +221,7 @@ export function useRequestEditor() {
               ...req,
               params: req.params || parseQueryStringToParams(splitUrlAndQuery(req.url || '').queryString)
             });
-            setResponse(responseCache[tabId] || req.lastResponse || null);
+            setResponse(responseCache[tabId] || null);
             targetColId = col.id;
             targetSubColId = found.subCollection ? found.subCollection.id : null;
             break;
@@ -302,7 +280,7 @@ export function useRequestEditor() {
       if (setMainView) setMainView('request');
 
       const restoredResponse =
-        responseCache[targetId] || draft?.response || req.lastResponse || null;
+        responseCache[targetId] || draft?.response || null;
       setResponse(restoredResponse);
     },
     [stashCurrentRequestDraft, applyRequestState, responseCache]
@@ -471,7 +449,6 @@ export function useRequestEditor() {
     handleUrlChange,
     handleParamsChange,
     handleSendRequest,
-    clearRequestResponse,
     handleSelectTab,
     handleSelectRequest,
     handleNewRequest,

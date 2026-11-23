@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Plus, FolderKanban } from 'lucide-react';
+import { X, XCircle, Plus, FolderKanban } from 'lucide-react';
 import { getMethodColor } from '../utils/formatters';
 
 export function RequestTabsBar({
@@ -8,8 +8,10 @@ export function RequestTabsBar({
   onSelectTab,
   onCloseTab,
   onNewTab,
+  onCloseAllTabs,
   requestName = '',
   onChangeRequestName,
+  onBlurRequestName,
   activeCollection = null,
   activeSubCollection = null
 }) {
@@ -25,7 +27,7 @@ export function RequestTabsBar({
             <div
               key={tab.id}
               onClick={() => onSelectTab(tab.id)}
-              className={`group flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-t-lg cursor-pointer transition-all border-t-2 max-w-[220px] shrink-0 ${
+              className={`group flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-t-lg cursor-pointer transition-all border-t-2 w-[200px] shrink-0 ${
                 isActive
                   ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-sky-500 shadow-xs border-r border-l border-slate-200 dark:border-slate-800 font-medium'
                   : 'bg-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/40 border-transparent'
@@ -41,9 +43,10 @@ export function RequestTabsBar({
                   type="text"
                   value={requestName}
                   onChange={(e) => onChangeRequestName(e.target.value)}
+                  onBlur={onBlurRequestName}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Request Name"
-                  className="bg-transparent font-medium text-slate-800 dark:text-slate-100 text-xs focus:outline-none focus:bg-slate-100 dark:focus:bg-slate-800 rounded px-1 -my-0.5 border-b border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-sky-500 w-24 sm:w-32 truncate placeholder:text-slate-400"
+                  className="bg-transparent font-medium text-slate-800 dark:text-slate-100 text-xs focus:outline-none focus:bg-slate-100 dark:focus:bg-slate-800 rounded px-1 -my-0.5 border-b border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-sky-500 flex-1 min-w-0 truncate placeholder:text-slate-400"
                   title="Click to rename request"
                 />
               ) : (
@@ -78,6 +81,18 @@ export function RequestTabsBar({
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
+
+        {/* Close All Tabs Button */}
+        {onCloseAllTabs && tabs.length > 0 && (
+          <button
+            type="button"
+            onClick={onCloseAllTabs}
+            className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors shrink-0"
+            title="Close All Tabs"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Right: Active Collection Association Badge */}

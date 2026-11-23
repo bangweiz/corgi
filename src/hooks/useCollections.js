@@ -10,7 +10,9 @@ import {
   duplicateCollectionData,
   duplicateRequestInTree,
   deleteRequestFromTree,
-  saveRequestIntoCollectionTarget
+  saveRequestIntoCollectionTarget,
+  stripResponses,
+  patchRequestInTree
 } from '../utils/collectionUtils';
 
 export function useCollections({
@@ -34,11 +36,14 @@ export function useCollections({
     try {
       const data = await api.getCollections();
       if (Array.isArray(data)) {
-        setCollections(data.map(normalizeCollection));
+        const normalized = data.map(normalizeCollection);
+        setCollections(normalized);
+        return normalized;
       }
     } catch (err) {
       console.error('Failed to load collections:', err);
     }
+    return [];
   }, []);
 
   const activeCollection = useMemo(() => {
@@ -56,7 +61,7 @@ export function useCollections({
   }, []);
 
   const saveAndRefresh = useCallback(async (updatedCol) => {
-    const data = await api.saveCollection(updatedCol);
+    const data = await api.saveCollection(stripResponses(updatedCol));
     if (data.success) {
       const cols = await api.getCollections();
       setCollections(cols.map(normalizeCollection));
@@ -84,8 +89,7 @@ export function useCollections({
             bodyType: currentReqData.bodyType,
             body: currentReqData.body,
             formData: currentReqData.formData,
-            extractRules: currentReqData.extractRules || [],
-            lastResponse: currentResponse || undefined
+            extractRules: currentReqData.extractRules || []
           };
 
           const { updatedCol } = saveRequestIntoCollectionTarget(
@@ -109,7 +113,7 @@ export function useCollections({
         openSaveModal();
       }
     },
-    [activeCollectionId, activeSubCollectionId, collections, activeRequestId, currentResponse, saveAndRefresh, triggerSaveFeedback]
+    [activeCollectionId, activeSubCollectionId, collections, activeRequestId, saveAndRefresh, triggerSaveFeedback]
   );
 
   /**
@@ -124,7 +128,7 @@ export function useCollections({
       request
     }) => {
       try {
-        const reqWithResponse = { ...request, lastResponse: currentResponse || undefined };
+        const reqWithResponse = { ...request };
         let finalColId;
         let finalSubColId;
         let colToSave;
@@ -400,6 +404,26 @@ export function useCollections({
     [collections, saveAndRefresh, onSelectRequest]
   );
 
+  /**
+   * Auto-save: patch only some fields (e.g. name, url) of an already-saved request.
+   * No-op for unsaved drafts or when nothing changed.
+   */
+  const handlePatchSavedRequest = useCallback(
+    async (colId, reqId, patch) => {
+      if (!colId || !reqId) return;
+      const targetCol = collections.find((c) => c.id === colId);
+      if (!targetCol) return;
+      const { updatedCol, changed } = patchRequestInTree(targetCol, reqId, patch);
+      if (!changed) return;
+      try {
+        await saveAndRefresh(updatedCol);
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+      }
+    },
+    [collections, saveAndRefresh]
+  );
+
   const handleDeleteRequest = useCallback(
     async (colId, subId, reqId) => {
       const targetCol = collections.find((c) => c.id === colId);
@@ -445,6 +469,7 @@ export function useCollections({
     handleCreateRequestInCollection,
     handleCreateRequestInSubCollection,
     handleDuplicateRequest,
+    handlePatchSavedRequest,
     handleDeleteRequest
   };
 }

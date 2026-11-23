@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Settings2, Plus, Trash2, Copy, Check, FileJson, ArrowLeft, Save, Search, Sparkles, HelpCircle } from 'lucide-react';
 
 export function EnvironmentView({
@@ -33,6 +33,20 @@ export function EnvironmentView({
       setEditingEnv(null);
     }
   }, [selectedEnvId, environments]);
+
+  // Auto-save unsaved changes when leaving the environment page (unmount)
+  const latestRef = useRef({});
+  latestRef.current = { editingEnv, environments, onSaveEnv };
+  useEffect(() => {
+    return () => {
+      const { editingEnv: draft, environments: envs, onSaveEnv: save } = latestRef.current;
+      if (!draft || !save) return;
+      const stored = envs.find((e) => e.id === draft.id);
+      if (stored && JSON.stringify(stored) !== JSON.stringify(draft)) {
+        save(draft);
+      }
+    };
+  }, []);
 
   // Keyboard shortcut Cmd+S / Ctrl+S to save environment
   useEffect(() => {
