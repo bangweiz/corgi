@@ -1,15 +1,7 @@
 import { useState, useCallback } from 'react';
 
-const INITIAL_TAB = {
-  id: 'req_1',
-  name: 'GET Request (with params)',
-  method: 'GET',
-  collectionId: 'sample',
-  subCollectionId: null
-};
-
 export function useRequestTabs() {
-  const [tabs, setTabs] = useState([INITIAL_TAB]);
+  const [tabs, setTabs] = useState([]);
 
   const addOrUpdateTab = useCallback((tabData) => {
     setTabs((prev) => {

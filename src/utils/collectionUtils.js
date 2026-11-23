@@ -5,13 +5,55 @@
  */
 import { generateId } from './urlSync.js';
 
-export function normalizeCollection(col) {
+function withoutResponse(req) {
+  if (!req || !('lastResponse' in req)) return req;
+  const { lastResponse, ...rest } = req;
+  return rest;
+}
+
+/**
+ * Responses are session-only: never persisted with a collection and never
+ * loaded from one. Strips any `lastResponse` from every request in the tree.
+ */
+export function stripResponses(col) {
   if (!col) return col;
   return {
     ...col,
+    requests: Array.isArray(col.requests) ? col.requests.map(withoutResponse) : col.requests,
+    subCollections: Array.isArray(col.subCollections)
+      ? col.subCollections.map((s) => ({
+          ...s,
+          requests: Array.isArray(s.requests) ? s.requests.map(withoutResponse) : s.requests
+        }))
+      : col.subCollections
+  };
+}
+
+export function normalizeCollection(col) {
+  if (!col) return col;
+  return stripResponses({
+    ...col,
     requests: Array.isArray(col.requests) ? col.requests : [],
     subCollections: Array.isArray(col.subCollections) ? col.subCollections : []
-  };
+  });
+}
+
+/** Update fields of a stored request (anywhere in the collection) without touching the rest. */
+export function patchRequestInTree(col, reqId, patch) {
+  const updatedCol = JSON.parse(JSON.stringify(col));
+  let changed = false;
+  const apply = (list) =>
+    (list || []).map((r) => {
+      if (r.id !== reqId) return r;
+      const next = { ...r, ...patch };
+      if (Object.keys(patch).some((k) => JSON.stringify(r[k]) !== JSON.stringify(patch[k]))) {
+        changed = true;
+      }
+      return next;
+    });
+  updatedCol.requests = apply(updatedCol.requests);
+  for (const s of updatedCol.subCollections || []) s.requests = apply(s.requests);
+  return { updatedCol, changed };
 }
 
 export function countCollectionRequests(col) {
@@ -81,7 +123,7 @@ export function duplicateSubCollectionData(sub) {
     id: 'sub_' + generateId(),
     name: `${sub.name} (Copy)`,
     requests: (sub.requests || []).map((r) => ({
-      ...JSON.parse(JSON.stringify(r)),
+      ...withoutResponse(JSON.parse(JSON.stringify(r))),
       id: 'req_' + generateId()
     }))
   };
@@ -137,7 +179,7 @@ export function duplicateCollectionData(sourceCol, existingCollections = []) {
   const newId = `${sourceCol.id.replace(/_copy.*$/, '')}_copy_${Date.now().toString(36)}`;
   const duplicatedSubs = (sourceCol.subCollections || []).map(duplicateSubCollectionData);
   const duplicatedDirectReqs = (sourceCol.requests || []).map((r) => ({
-    ...JSON.parse(JSON.stringify(r)),
+    ...withoutResponse(JSON.parse(JSON.stringify(r))),
     id: 'req_' + generateId()
   }));
 
@@ -166,7 +208,7 @@ export function duplicateRequestInTree(col, subId, reqId) {
       const idx = (foundSub.requests || []).findIndex((r) => r.id === reqId);
       if (idx >= 0) {
         const srcReq = foundSub.requests[idx];
-        duplicatedReq = { ...JSON.parse(JSON.stringify(srcReq)), id: 'req_' + generateId(), name: `${srcReq.name || 'Untitled Request'} (Copy)` };
+        duplicatedReq = { ...withoutResponse(JSON.parse(JSON.stringify(srcReq))), id: 'req_' + generateId(), name: `${srcReq.name || 'Untitled Request'} (Copy)` };
         foundSub.requests.splice(idx + 1, 0, duplicatedReq);
         return { updatedCol, newReq: duplicatedReq, subId };
       }
@@ -177,7 +219,7 @@ export function duplicateRequestInTree(col, subId, reqId) {
     const idx = updatedCol.requests.findIndex((r) => r.id === reqId);
     if (idx >= 0) {
       const srcReq = updatedCol.requests[idx];
-      duplicatedReq = { ...JSON.parse(JSON.stringify(srcReq)), id: 'req_' + generateId(), name: `${srcReq.name || 'Untitled Request'} (Copy)` };
+      duplicatedReq = { ...withoutResponse(JSON.parse(JSON.stringify(srcReq))), id: 'req_' + generateId(), name: `${srcReq.name || 'Untitled Request'} (Copy)` };
       updatedCol.requests.splice(idx + 1, 0, duplicatedReq);
       return { updatedCol, newReq: duplicatedReq, subId: null };
     }
@@ -187,7 +229,7 @@ export function duplicateRequestInTree(col, subId, reqId) {
     const idx = (s.requests || []).findIndex((r) => r.id === reqId);
     if (idx >= 0) {
       const srcReq = s.requests[idx];
-      duplicatedReq = { ...JSON.parse(JSON.stringify(srcReq)), id: 'req_' + generateId(), name: `${srcReq.name || 'Untitled Request'} (Copy)` };
+      duplicatedReq = { ...withoutResponse(JSON.parse(JSON.stringify(srcReq))), id: 'req_' + generateId(), name: `${srcReq.name || 'Untitled Request'} (Copy)` };
       s.requests.splice(idx + 1, 0, duplicatedReq);
       return { updatedCol, newReq: duplicatedReq, subId: s.id };
     }

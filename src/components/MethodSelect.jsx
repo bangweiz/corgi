@@ -72,7 +72,7 @@ export function MethodSelect({
         onKeyDown={handleKeyDown}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`h-10 pl-3 pr-2.5 rounded-lg font-bold text-xs font-mono border flex items-center justify-between gap-2 transition-all shadow-xs focus:outline-none focus:ring-2 focus:ring-sky-500/40 select-none ${
+        className={`h-9 pl-3 pr-2.5 rounded-lg font-bold text-xs font-mono border flex items-center justify-between gap-2 transition-all shadow-xs focus:outline-none focus:ring-2 focus:ring-sky-500/40 select-none ${
           currentStyle.bg
         } ${currentStyle.text} ${
           disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'

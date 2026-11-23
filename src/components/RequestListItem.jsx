@@ -1,13 +1,12 @@
 import React from 'react';
 import { Copy, Trash2 } from 'lucide-react';
-import { getMethodColor, getStatusBadge } from '../utils/formatters';
+import { getMethodColor } from '../utils/formatters';
 
 export function RequestListItem({
   req,
   collectionId,
   subCollectionId = null,
   isSelected = false,
-  cachedResponse = null,
   onSelectRequest,
   onDuplicateRequest,
   onDeleteRequest,
@@ -15,7 +14,6 @@ export function RequestListItem({
   parentName = ''
 }) {
   const mColor = getMethodColor(req.method);
-  const cached = cachedResponse || req.lastResponse;
 
   const handleDelete = (e) => {
     e.stopPropagation();
@@ -51,15 +49,6 @@ export function RequestListItem({
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        {cached && cached.status !== undefined && (
-          <span
-            className={`text-[9px] font-mono font-bold px-1 py-0.5 rounded border ${getStatusBadge(cached.status).bg}`}
-            title={`Cached Response: ${cached.status} (${cached.durationMs || 0} ms)`}
-          >
-            {cached.status}
-          </span>
-        )}
-
         {onDuplicateRequest && (
           <button
             onClick={(e) => {
